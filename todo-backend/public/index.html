@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>To-Do App with Gemini AI</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+  body { background: #0f172a; color: #e2e8f0; min-height: 100vh; display: flex; justify-content: center; padding: 40px 16px; }
+  .container { width: 100%; max-width: 620px; }
+  h1 { text-align: center; margin-bottom: 8px; }
+  p.subtitle { text-align: center; color: #94a3b8; margin-bottom: 24px; }
+  .input-row { display: flex; gap: 8px; margin-bottom: 16px; }
+  input[type="text"] { flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #334155; background: #1e293b; color: #e2e8f0; }
+  button { padding: 12px 16px; border: none; border-radius: 8px; cursor: pointer; background: #6366f1; color: white; font-weight: 600; }
+  button:hover { background: #4f46e5; }
+  button.ai { background: #10b981; }
+  button.ai:hover { background: #059669; }
+  button.delete { background: #ef4444; padding: 6px 10px; font-size: 12px; }
+  ul { list-style: none; }
+  li { background: #1e293b; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+  .task-row { display: flex; align-items: center; gap: 10px; }
+  .task-row span { flex: 1; }
+  .task-row span.done { text-decoration: line-through; color: #64748b; }
+  .subtasks { margin-top: 8px; margin-left: 28px; }
+  .subtasks li { background: #0f172a; font-size: 14px; padding: 8px 12px; }
+  .api-key-row { margin-bottom: 16px; font-size: 13px; color: #94a3b8; }
+  #status { margin-top: 10px; color: #fbbf24; font-size: 14px; min-height: 18px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>✅ To-Do App</h1>
+  <p class="subtitle">Add tasks, check them off, and let Gemini AI break them into subtasks.</p>
+
+  <div class="input-row">
+    <input type="text" id="taskInput" placeholder="What do you need to do?" />
+    <button onclick="addTask()">Add</button>
+  </div>
+
+  <ul id="taskList"></ul>
+  <div id="status"></div>
+</div>
+
+<script>
+const tasks = [];
+
+function addTask() {
+  const input = document.getElementById('taskInput');
+  const text = input.value.trim();
+  if (!text) return;
+  tasks.push({ text, done: false, subtasks: [] });
+  input.value = '';
+  render();
+}
+
+function toggleTask(i) { tasks[i].done = !tasks[i].done; render(); }
+function deleteTask(i) { tasks.splice(i, 1); render(); }
+
+function render() {
+  const list = document.getElementById('taskList');
+  list.innerHTML = '';
+  tasks.forEach((t, i) => {
+    const li = document.createElement('li');
+    li.innerHTML = `
+      <div class="task-row">
+        <input type="checkbox" ${t.done ? 'checked' : ''} onchange="toggleTask(${i})" />
+        <span class="${t.done ? 'done' : ''}">${escapeHtml(t.text)}</span>
+        <button class="ai" onclick="breakIntoSubtasks(${i})">✨ AI Break Down</button>
+        <button class="delete" onclick="deleteTask(${i})">Delete</button>
+      </div>`;
+    if (t.subtasks.length) {
+      const ul = document.createElement('ul');
+      ul.className = 'subtasks';
+      t.subtasks.forEach(s => {
+        const sli = document.createElement('li');
+        sli.textContent = '• ' + s;
+        ul.appendChild(sli);
+      });
+      li.appendChild(ul);
+    }
+    list.appendChild(li);
+  });
+}
+
+async function breakIntoSubtasks(i) {
+  const status = document.getElementById('status');
+  status.textContent = 'Thinking...';
+  try {
+    const res = await fetch('/api/breakdown', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ task: tasks[i].text })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    tasks[i].subtasks = data.subtasks;
+    status.textContent = '';
+    render();
+  } catch (e) {
+    status.textContent = '❌ Error: ' + e.message;
+  }
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+</script>
+</body>
+</html>
